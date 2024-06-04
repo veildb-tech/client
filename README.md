@@ -16,5 +16,5 @@ Documentation:
     And then place the executable file in the bin directory (if it doesn’t exist, then create it)     
 
 ---Creating a build for Windows
-    To create a build for Windows, you need to go to the root of the directory where the code is contained and run the command: ```GOOS=windows GOARCH=amd64 go build -o bin/db-manager-64.cmd```
+    To create a build for Windows, you need to go to the root of the directory where the code is contained and run the command: ```GOOS=windows GOARCH=amd64 go build -o bin/db-manager-64.exe```
 
