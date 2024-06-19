@@ -13,7 +13,6 @@ var downloadCmd = &cobra.Command{
 	Use:   "download",
 	Short: "Download dump!",
 	Long:  `Downloading a dump of the database.`,
-	//Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
 		dumpUid, _ := cmd.Flags().GetString("dump-uid")
 		dbUid, _ := cmd.Flags().GetString("db-uid")

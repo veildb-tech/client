@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Bridge Digital
+*/
 package keypubfile
 
 import (
@@ -6,6 +9,7 @@ import (
 	"strings"
 
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services"
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 )
 
 // Key file operations
@@ -14,7 +18,7 @@ func IsKeyFileExist(keyname string) bool {
 
 	configDir, errDir := services.CurrentAppDir()
 	if errDir != nil {
-		fmt.Printf("Cannot get current APP directory: %W.\n", errDir)
+		fmt.Printf(predefined.BuildError("Cannot get current APP directory: %W.\n"), errDir)
 		return false
 	}
 
@@ -35,7 +39,7 @@ func IsKeyFileExist(keyname string) bool {
 func CreateKeyPubFile(keyname string) string {
 	configDir, errDir := services.CurrentAppDir()
 	if errDir != nil {
-		fmt.Printf("Cannot get current APP directory: %W.\n", errDir)
+		fmt.Printf(predefined.BuildError("Cannot get current APP directory: %W.\n"), errDir)
 		return ""
 	}
 
@@ -49,7 +53,7 @@ func CreateKeyPubFile(keyname string) string {
 
 	file, err := os.Create(configDir + "/" + keyFileName)
 	if err != nil {
-		fmt.Println("Cannot create key file:", err)
+		fmt.Println(predefined.BuildError("Cannot create key file:"), err)
 		return ""
 	}
 
@@ -61,7 +65,7 @@ func CreateKeyPubFile(keyname string) string {
 func WriteKeyPubFile(keyData string, keyFileName string) string {
 	configDir, errDir := services.CurrentAppDir()
 	if errDir != nil {
-		fmt.Printf("Cannot get current APP directory: %W.\n", errDir)
+		fmt.Printf(predefined.BuildError("Cannot get current APP directory: %W.\n"), errDir)
 		return ""
 	}
 
@@ -77,7 +81,7 @@ func WriteKeyPubFile(keyData string, keyFileName string) string {
 
 	err := os.WriteFile(configDir+"/"+keyFileName, data, 0664)
 	if err != nil {
-		fmt.Println("Cannot write key file:", err)
+		fmt.Println(predefined.BuildError("Cannot write key file:"), err)
 	}
 
 	return keyFileName
@@ -89,7 +93,7 @@ func ReadKeyPubFile(keyname string) string {
 	if IsKeyFileExist(keyname) {
 		configDir, errDir := services.CurrentAppDir()
 		if errDir != nil {
-			fmt.Printf("Cannot get current APP directory: %W.\n", errDir)
+			fmt.Printf(predefined.BuildError("Cannot get current APP directory: %W.\n"), errDir)
 			return ""
 		}
 
@@ -101,13 +105,13 @@ func ReadKeyPubFile(keyname string) string {
 
 		keyData, err := os.ReadFile(configDir + "/" + keyname + ext)
 		if err != nil {
-			fmt.Printf("Cannot read the %s file: %W.\n", keyname+ext, errDir)
+			fmt.Printf(predefined.BuildError("Cannot read the %s file: %W.\n"), keyname+ext, errDir)
 			return ""
 		}
 
 		result = string(keyData)
 	} else {
-		fmt.Println("Couldn't find key file. Ask the admin to give you a public key. Or create one if you have one using the save-key command.")
+		fmt.Println(predefined.BuildWarning("Couldn't find key file. Ask the admin to give you a public key. Or create one if you have one using the save-key command."))
 	}
 
 	return result

@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Bridge Digital
+*/
 package savekey
 
 import (
@@ -7,11 +10,12 @@ import (
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/envfile"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/keypubfile"
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 	"github.com/AlecAivazis/survey/v2"
 	"golang.org/x/exp/maps"
 )
 
-func Execute(isNew bool) string {
+func Execute(isNew bool, keyName string) string {
 	if !isNew {
 		reCreate()
 		return ""
@@ -33,20 +37,11 @@ func Execute(isNew bool) string {
 		return ""
 	}
 
-	var keyName, keyData string
+	var keyData string
 
-	qKeyName := &survey.Question{
-		Name:   "Key Name",
-		Prompt: &survey.Input{Message: "Enter public key name:"},
-		Validate: func(val interface{}) error {
-			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {
-				return fmt.Errorf("the key name cannot be empty")
-			}
-			return nil
-		},
+	if len(keyName) == 0 {
+		return ""
 	}
-
-	survey.AskOne(qKeyName.Prompt, &keyName, survey.WithValidator(qKeyName.Validate))
 
 	if !keypubfile.IsKeyFileExist(keyName) {
 		keypubfile.CreateKeyPubFile(keyName)
@@ -68,7 +63,7 @@ func Execute(isNew bool) string {
 		Prompt: &survey.Multiline{Message: "Enter public key:"},
 		Validate: func(val interface{}) error {
 			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {
-				return fmt.Errorf("the key cannot be empty")
+				return fmt.Errorf(predefined.BuildError("the key cannot be empty"))
 			}
 			return nil
 		},
@@ -83,49 +78,65 @@ func Execute(isNew bool) string {
 func reCreate() {
 	savedWorkspaces, err := envfile.ReadEnvFile()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println(predefined.BuildError("Error:"), err)
 		return
 	}
 
 	var (
-		selectedWorkspaceIndex int
-		savedWorkspacesKeys    []string
-		options                = []string{"Yes", "No"}
-		selectedOption         string
+		selectedWorkspaceIndex, selectedServerIndex int
+		savedWorkspacesKeys, savedServersKeys       []string
+		options                                     = []string{"Yes", "No"}
+		selectedOption, currentWorkspace            string
 	)
 
 	savedWorkspacesKeys = maps.Keys(savedWorkspaces)
 
-	promptW := &survey.Select{
-		Message: "Select one of your saved workspaces:",
-		Options: savedWorkspacesKeys,
+	if len(savedWorkspacesKeys) > 1 {
+		promptW := &survey.Select{
+			Message: "Select one of your saved workspaces:",
+			Options: savedWorkspacesKeys,
+		}
+
+		survey.AskOne(promptW, &selectedWorkspaceIndex)
+	} else {
+		selectedWorkspaceIndex = 0
+		fmt.Println(predefined.BuildAnsw("Your saved workspaces: ", savedWorkspacesKeys[selectedWorkspaceIndex]))
 	}
 
-	survey.AskOne(promptW, &selectedWorkspaceIndex)
+	currentWorkspace = savedWorkspacesKeys[selectedWorkspaceIndex]
 
-	savedConfigData := savedWorkspaces[savedWorkspacesKeys[selectedWorkspaceIndex]]
-	selectedKey := savedConfigData.KeyFile
+	savedConfigData := savedWorkspaces[currentWorkspace]
+
+	savedServers := savedWorkspaces[currentWorkspace].Servers
+	savedServersKeys = maps.Keys(savedServers)
+
+	if len(savedServersKeys) > 1 {
+		promptS := &survey.Select{
+			Message: "Select one of your saved servers:",
+			Options: savedServersKeys,
+		}
+
+		survey.AskOne(promptS, &selectedServerIndex)
+	} else {
+		selectedServerIndex = 0
+		fmt.Println(predefined.BuildAnsw("Your saved server: ", savedServersKeys[selectedServerIndex]))
+	}
+
+	savedKeyName := savedServers[savedServersKeys[selectedServerIndex]].KeyFile
 
 keyNameAsk:
 
-	var keyName, keyData string
+	var keyName, keyData, currentServerName string
 
-	qKeyNamePrompt := &survey.Input{
-		Message: "Enter a new name or leave the field blank if you want to use the old one:",
-		Help:    "The default key name is the previous key name",
-		Default: selectedKey,
-	}
+	currentServerName = savedServersKeys[selectedServerIndex]
 
-	survey.AskOne(qKeyNamePrompt, &keyName)
+	if !keypubfile.IsKeyFileExist(savedKeyName) {
+		keyName = currentWorkspace + "_" + currentServerName
 
-	if len(keyName) == 0 {
-		return
-	}
-
-	if !keypubfile.IsKeyFileExist(keyName) {
 		if len(keyName) > 0 {
 			keyName = keypubfile.CreateKeyPubFile(keyName)
 		} else {
+			fmt.Println(predefined.BuildError("Something is wrong with getting the server key name."))
 			return
 		}
 	} else {
@@ -139,6 +150,8 @@ keyNameAsk:
 		if selectedOption == "No" {
 			goto keyNameAsk
 		}
+
+		keyName = savedKeyName
 	}
 
 	qKeyData := &survey.Question{
@@ -146,7 +159,7 @@ keyNameAsk:
 		Prompt: &survey.Multiline{Message: "Enter public key:"},
 		Validate: func(val interface{}) error {
 			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {
-				return fmt.Errorf("the key cannot be empty")
+				return fmt.Errorf(predefined.BuildError("the key cannot be empty"))
 			}
 			return nil
 		},
@@ -166,11 +179,12 @@ keyNameAsk:
 				"token":     savedConfigData.ServiceToken,
 				"workspace": savedWorkspacesKeys[selectedWorkspaceIndex],
 				"keyName":   keyName,
+				"server":    currentServerName,
 			}
 
 			envfile.WriteEnvFile(envfile.ConfigData(configData))
 
-			fmt.Println("The public key has been saved successfully")
+			fmt.Println(predefined.BuildOk("The public key has been saved successfully"))
 		}
 	}
 }

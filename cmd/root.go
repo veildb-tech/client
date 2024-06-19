@@ -11,9 +11,9 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "db-manager",
-	Short: "Console Tool",
-	Long:  ``,
+	Use:   "dbvisor",
+	Short: "DBVisor App",
+	Long:  `DBvisor App is a CLI utility designed for convenient work on downloading the necessary database dumps.`,
 	// Uncomment the following line if your bare application
 	// has an action associated with it:
 	// Run: func(cmd *cobra.Command, args []string) { },
@@ -40,6 +40,7 @@ func init() {
 	//rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
 	//rootCmd.Flags().BoolP("quiet", "q", false, "Do not output any message")
 	rootCmd.Flags().BoolP("version", "V", false, "Display this application version")
+	rootCmd.Root().CompletionOptions.DisableDefaultCmd = true
 	//rootCmd.Flags().BoolP("toggle", "--ansi", false, "Force (or disable --no-ansi) ANSI output")
 	//rootCmd.Flags().BoolP("no-interaction", "n", false, "Do not ask any interactive question")
 	//rootCmd.Flags().BoolP("verbose", "v", false, "Increase the verbosity of messages: 1 for normal output, 2 for more verbose output and 3 for debug")

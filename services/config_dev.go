@@ -1,5 +1,5 @@
-//go:build !dev
-// +build !dev
+//go:build dev
+// +build dev
 
 /*
 Copyright © 2024 Bridge Digital
@@ -14,7 +14,7 @@ import (
 )
 
 const (
-	WebServiceUrl    string = "https://app.dbvisor.pro"
+	WebServiceUrl    string = "https://db-manager.bridge2.digital"
 	WebServiceApiUrl string = "api"
 	AppName          string = "dbvisor"
 	EnvFileName      string = ".env.json"

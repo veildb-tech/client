@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/processes/savekey"
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 	"github.com/spf13/cobra"
 )
 
@@ -14,12 +15,12 @@ import (
 var saveKeyCmd = &cobra.Command{
 	Use:   "save-key",
 	Short: "Add public key!",
-	Long:  `Creating/editing a public key.`,
+	Long:  `Creating/editing a PEM public key.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var result string = savekey.Execute(false)
+		var result string = savekey.Execute(false, "")
 
 		if result != "" {
-			fmt.Println("The public key has been saved successfully")
+			fmt.Println(predefined.BuildOk("The public key has been saved successfully"))
 		}
 	},
 }

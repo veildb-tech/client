@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/processes/login"
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 	"github.com/spf13/cobra"
 )
 
@@ -17,7 +18,7 @@ var loginCmd = &cobra.Command{
 	Long:  `Creating/updating a token and creating/editing a public key in the configuration file required for downloading database dumps.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var result string = login.Execute(cmd)
-		fmt.Println(result)
+		fmt.Println(predefined.BuildOk(result))
 	},
 }
 

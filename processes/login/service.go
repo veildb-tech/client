@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Bridge Digital
+*/
 package login
 
 import (
@@ -8,6 +11,7 @@ import (
 	saveKey "gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/processes/savekey"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/envfile"
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/request"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/response"
 	workspacePac "gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/workspace"
@@ -22,14 +26,14 @@ func Execute(cmd *cobra.Command) string {
 		"password": "",
 	}
 
-	var token, username, password, workspace, keyFileName string
+	var token, username, password, workspace, keyFileName, server string
 
 	qUsername := &survey.Question{
 		Name:   "Username",
 		Prompt: &survey.Input{Message: "Username:"},
 		Validate: func(val interface{}) error {
 			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {
-				return fmt.Errorf("the Username cannot be empty")
+				return fmt.Errorf(predefined.BuildError("the Username cannot be empty"))
 			}
 			return nil
 		},
@@ -47,7 +51,7 @@ func Execute(cmd *cobra.Command) string {
 		Prompt: &survey.Password{Message: "Password:"},
 		Validate: func(val interface{}) error {
 			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {
-				return fmt.Errorf("the Password cannot be empty")
+				return fmt.Errorf(predefined.BuildError("the Password cannot be empty"))
 			}
 			return nil
 		},
@@ -65,7 +69,7 @@ func Execute(cmd *cobra.Command) string {
 		return ""
 	}
 
-	workspace = workspacePac.Workspace(token)
+	workspace, server = workspacePac.Workspace(token)
 	if len(workspace) == 0 {
 		return ""
 	}
@@ -73,6 +77,7 @@ func Execute(cmd *cobra.Command) string {
 	configData := map[string]string{
 		"token":     token,
 		"workspace": workspace,
+		"server":    server,
 	}
 
 	if !envfile.IsEnvFileExist(false) {
@@ -80,7 +85,7 @@ func Execute(cmd *cobra.Command) string {
 		envfile.CreateEnvFile(envfile.ConfigData(configData))
 	}
 
-	keyFileName = saveKey.Execute(true)
+	keyFileName = saveKey.Execute(true, workspace+"_"+server)
 
 	if len(keyFileName) > 0 {
 		configData["keyName"] = keyFileName
@@ -88,14 +93,14 @@ func Execute(cmd *cobra.Command) string {
 
 	envfile.WriteEnvFile(envfile.ConfigData(configData))
 
-	return "You logged in successfully"
+	return predefined.BuildOk("You logged in successfully")
 }
 
 // Get token from server
 func jwtToken(credentials map[string]string) string {
 	credsInJson, err := json.Marshal(credentials)
 	if err != nil {
-		fmt.Println("Error encoding to json:", err)
+		fmt.Println(predefined.BuildError("Error encoding to json:"), err)
 		return ""
 	}
 

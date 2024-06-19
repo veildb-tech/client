@@ -1,3 +1,6 @@
+/*
+Copyright © 2024 Bridge Digital
+*/
 package encrypter
 
 import (
@@ -10,18 +13,19 @@ import (
 	"strings"
 
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/keypubfile"
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 )
 
 func EncryptData(dbDumpData map[string]string, keyPubFileName string) []byte {
 	dbDumpDataEncoded, err := json.Marshal(dbDumpData)
 	if err != nil {
-		fmt.Println("Error encoding to json:", err)
+		fmt.Println(predefined.BuildError("Error encoding to json:"), err)
 		return nil
 	}
 
 	keyData := keypubfile.ReadKeyPubFile(keyPubFileName)
 	if len(strings.TrimSpace(keyData)) == 0 {
-		fmt.Println("The public key is empty. Please re-create a public key.")
+		fmt.Println(predefined.BuildWarning("The public key is empty. Please re-create a public key."))
 		return nil
 	}
 
@@ -30,27 +34,27 @@ func EncryptData(dbDumpData map[string]string, keyPubFileName string) []byte {
 	// Decode the PEM block
 	block, _ := pem.Decode(pubKeyBytes)
 	if block == nil || block.Type != "PUBLIC KEY" {
-		fmt.Println("Failed to decode PEM block containing public key.")
+		fmt.Println(predefined.BuildError("Failed to decode PEM block containing public key."))
 		return nil
 	}
 
 	// Parse the public key
 	pub, err := x509.ParsePKIXPublicKey(block.Bytes)
 	if err != nil {
-		fmt.Printf("Error parsing public key: %v", err)
+		fmt.Printf(predefined.BuildError("Error parsing public key: %v"), err)
 		return nil
 	}
 
 	// Assert the type to *rsa.PublicKey
 	rsaPubKey, ok := pub.(*rsa.PublicKey)
 	if !ok {
-		fmt.Println("Not an RSA public key.")
+		fmt.Println(predefined.BuildWarning("Not an RSA public key."))
 		return nil
 	}
 
 	encryptedData, err := rsa.EncryptPKCS1v15(rand.Reader, rsaPubKey, dbDumpDataEncoded)
 	if err != nil {
-		fmt.Printf("Error encrypting data: %v", err)
+		fmt.Printf(predefined.BuildError("Error encrypting data: %v"), err)
 		return nil
 	}
 
