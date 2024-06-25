@@ -27,9 +27,10 @@ To create a build for Windows, you need to go to the root of the directory where
   
 ### Commands
 
-- **login** - *Creating/updating a token and creating/editing a public key in the configuration file required for downloading database dumps.*
+- **login** - *Creating/updating a token and creating/updating a public key in the configuration file required for downloading database dumps.*
 - **download** - *Downloading a dump of the database.*
-- **save-key** - *Creating/editing a PEM public key.*
+- **save-key** - *Creating/updating a PEM public key.*
 - **install** - *Installing a CLI application.*
+- **config** - *Sets a new default path for saving database dumps.*
 
 

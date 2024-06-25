@@ -14,7 +14,7 @@ import (
 // saveKeyCmd represents the saveKey command
 var saveKeyCmd = &cobra.Command{
 	Use:   "save-key",
-	Short: "Add public key!",
+	Short: "Add public key",
 	Long:  `Creating/editing a PEM public key.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var result string = savekey.Execute(false, "")

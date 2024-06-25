@@ -14,7 +14,7 @@ import (
 // loginCmd represents the login command
 var loginCmd = &cobra.Command{
 	Use:   "login",
-	Short: "Authorize to service!",
+	Short: "Authorize to service",
 	Long:  `Creating/updating a token and creating/editing a public key in the configuration file required for downloading database dumps.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		var result string = login.Execute(cmd)

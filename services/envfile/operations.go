@@ -14,24 +14,32 @@ import (
 )
 
 type Server struct {
-	KeyFile string `json:"key_file"`
+	KeyFile  string `json:"key_file"`
+	ServerId string `json:"server_id"`
 }
 
 type Workspace struct {
-	ServiceToken string            `json:"token"`
-	Servers      map[string]Server `json:"servers"`
+	Servers map[string]Server `json:"servers"`
+}
+
+type Config struct {
+	DownloadDumpPath string               `json:"dump_path"`
+	ServiceToken     string               `json:"token"`
+	CurrentWorkspace string               `json:"current_workspace"`
+	Data             map[string]Workspace `json:"data"`
 }
 
 type ConfigDataService interface {
 	ConfigData()
 }
 
-func ConfigData(userData map[string]string) map[string]Workspace {
+func ConfigData(userData map[string]string) Config {
 	var workspace string = userData["workspace"]
 	var server string = userData["server"]
 
 	currentServer := Server{
-		KeyFile: userData["keyName"],
+		KeyFile:  userData["keyName"],
+		ServerId: userData["serverId"],
 	}
 
 	serversData := map[string]Server{
@@ -39,14 +47,19 @@ func ConfigData(userData map[string]string) map[string]Workspace {
 	}
 
 	data := Workspace{
-		ServiceToken: userData["token"],
-		Servers:      serversData,
+		Servers: serversData,
 	}
 
 	var configData = map[string]Workspace{}
 	configData[workspace] = data
 
-	return configData
+	config := Config{
+		ServiceToken:     userData["token"],
+		CurrentWorkspace: workspace,
+		Data:             configData,
+	}
+
+	return config
 }
 
 func IsEnvFileExist(msgSupress bool) bool {
@@ -69,7 +82,7 @@ func IsEnvFileExist(msgSupress bool) bool {
 	return result
 }
 
-func CreateEnvFile(config map[string]Workspace) {
+func CreateEnvFile(config Config) {
 	configDir, errDir := services.CurrentAppDir()
 	if errDir != nil {
 		fmt.Printf(predefined.BuildError("Cannot get current APP directory: %W.\n"), errDir)
@@ -92,9 +105,8 @@ func CreateEnvFile(config map[string]Workspace) {
 	}
 }
 
-func WriteEnvFile(config map[string]Workspace) {
-	workspaceKeys := maps.Keys(config)
-	workspace := workspaceKeys[0]
+func WriteEnvFile(config Config) {
+	workspace := config.CurrentWorkspace
 
 	if !IsEnvFileExist(true) {
 		CreateEnvFile(config)
@@ -106,25 +118,34 @@ func WriteEnvFile(config map[string]Workspace) {
 		return
 	}
 
-	serverKeys := maps.Keys(config[workspace].Servers)
+	serverKeys := maps.Keys(config.Data[workspace].Servers)
 	server := serverKeys[0]
 
-	workspaceDataFromFile, v := configFromFile[workspace]
-	if v {
-		serverDataFromFile, vs := workspaceDataFromFile.Servers[server]
-		if vs {
-			serverDataFromFile.KeyFile = config[workspace].Servers[server].KeyFile
-			workspaceDataFromFile.Servers[server] = serverDataFromFile
+	if len(server) > 0 {
+		workspaceDataFromFile, v := configFromFile.Data[workspace]
+		if v {
+			serverDataFromFile, vs := workspaceDataFromFile.Servers[server]
+			if vs {
+				serverDataFromFile.KeyFile = config.Data[workspace].Servers[server].KeyFile
+				workspaceDataFromFile.Servers[server] = serverDataFromFile
+			} else {
+				workspaceDataFromFile.Servers[server] = Server{
+					KeyFile:  config.Data[workspace].Servers[server].KeyFile,
+					ServerId: config.Data[workspace].Servers[server].ServerId,
+				}
+			}
+			configFromFile.Data[workspace] = workspaceDataFromFile
 		} else {
-			workspaceDataFromFile.Servers[server] = Server{KeyFile: config[workspace].Servers[server].KeyFile}
+			configFromFile.Data[workspace] = config.Data[workspace]
 		}
-
-		workspaceDataFromFile.ServiceToken = config[workspace].ServiceToken
-
-		configFromFile[workspace] = workspaceDataFromFile
-	} else {
-		configFromFile[workspace] = config[workspace]
 	}
+
+	if len(config.DownloadDumpPath) > 0 {
+		configFromFile.DownloadDumpPath = config.DownloadDumpPath
+	}
+
+	configFromFile.ServiceToken = config.ServiceToken
+	configFromFile.CurrentWorkspace = config.CurrentWorkspace
 
 	data, errData := json.Marshal(configFromFile)
 	if errData != nil {
@@ -145,26 +166,26 @@ func WriteEnvFile(config map[string]Workspace) {
 	}
 }
 
-func ReadEnvFile() (map[string]Workspace, error) {
+func ReadEnvFile() (Config, error) {
+	config := Config{}
+
 	if !IsEnvFileExist(true) {
-		return nil, fmt.Errorf(predefined.BuildError("env file not found. Please use the [login] command to update it"))
+		return config, fmt.Errorf(predefined.BuildError("env file not found. Please use the [login] command to update it"))
 	}
 
 	configDir, errDir := services.CurrentAppDir()
 	if errDir != nil {
-		return nil, fmt.Errorf(predefined.BuildError("cannot get current APP directory: %W"), errDir)
+		return config, fmt.Errorf(predefined.BuildError("cannot get current APP directory: %W"), errDir)
 	}
 
 	file, err := os.ReadFile(configDir + "/" + services.EnvFileName)
 	if err != nil {
-		return nil, fmt.Errorf(predefined.BuildError("env file is not readable: %W"), errDir)
+		return config, fmt.Errorf(predefined.BuildError("env file is not readable: %W"), errDir)
 	}
-
-	config := make(map[string]Workspace)
 
 	err = json.Unmarshal(file, &config)
 	if err != nil {
-		return nil, fmt.Errorf(predefined.BuildError("the settings record is not readable: %W"), errDir)
+		return config, fmt.Errorf(predefined.BuildError("the settings record is not readable: %W"), errDir)
 	}
 
 	return config, nil

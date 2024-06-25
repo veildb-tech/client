@@ -22,22 +22,9 @@ func Execute(isNew bool, keyName string) string {
 	}
 
 	var (
-		options        = []string{"Yes", "No"}
-		selectedOption string
+		options                 = []string{"Yes", "No"}
+		selectedOption, keyData string
 	)
-
-	prompt := &survey.Select{
-		Message: "Want to create a public Pem key for downloading?",
-		Options: options,
-	}
-
-	survey.AskOne(prompt, &selectedOption)
-
-	if selectedOption == "No" {
-		return ""
-	}
-
-	var keyData string
 
 	if len(keyName) == 0 {
 		return ""
@@ -59,7 +46,6 @@ func Execute(isNew bool, keyName string) string {
 	}
 
 	qKeyData := &survey.Question{
-		Name:   "Key Data",
 		Prompt: &survey.Multiline{Message: "Enter public key:"},
 		Validate: func(val interface{}) error {
 			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {
@@ -76,38 +62,25 @@ func Execute(isNew bool, keyName string) string {
 
 // Function for regenerating a key
 func reCreate() {
-	savedWorkspaces, err := envfile.ReadEnvFile()
+	savedConfig, err := envfile.ReadEnvFile()
 	if err != nil {
 		fmt.Println(predefined.BuildError("Error:"), err)
 		return
 	}
 
 	var (
-		selectedWorkspaceIndex, selectedServerIndex int
-		savedWorkspacesKeys, savedServersKeys       []string
-		options                                     = []string{"Yes", "No"}
-		selectedOption, currentWorkspace            string
+		selectedServerIndex              int
+		savedServersKeys                 []string
+		options                          = []string{"Yes", "No"}
+		selectedOption, currentWorkspace string
 	)
 
-	savedWorkspacesKeys = maps.Keys(savedWorkspaces)
+	fmt.Println(predefined.BuildAnsw("Your workspace: ", savedConfig.CurrentWorkspace))
 
-	if len(savedWorkspacesKeys) > 1 {
-		promptW := &survey.Select{
-			Message: "Select one of your saved workspaces:",
-			Options: savedWorkspacesKeys,
-		}
+	currentWorkspace = savedConfig.CurrentWorkspace
+	savedConfigData := savedConfig.Data[currentWorkspace]
 
-		survey.AskOne(promptW, &selectedWorkspaceIndex)
-	} else {
-		selectedWorkspaceIndex = 0
-		fmt.Println(predefined.BuildAnsw("Your saved workspaces: ", savedWorkspacesKeys[selectedWorkspaceIndex]))
-	}
-
-	currentWorkspace = savedWorkspacesKeys[selectedWorkspaceIndex]
-
-	savedConfigData := savedWorkspaces[currentWorkspace]
-
-	savedServers := savedWorkspaces[currentWorkspace].Servers
+	savedServers := savedConfigData.Servers
 	savedServersKeys = maps.Keys(savedServers)
 
 	if len(savedServersKeys) > 1 {
@@ -155,7 +128,6 @@ keyNameAsk:
 	}
 
 	qKeyData := &survey.Question{
-		Name:   "Key Data",
 		Prompt: &survey.Multiline{Message: "Enter public key:"},
 		Validate: func(val interface{}) error {
 			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {
@@ -176,10 +148,11 @@ keyNameAsk:
 	if envfile.IsEnvFileExist(false) {
 		if len(keyName) > 0 {
 			configData := map[string]string{
-				"token":     savedConfigData.ServiceToken,
-				"workspace": savedWorkspacesKeys[selectedWorkspaceIndex],
+				"token":     savedConfig.ServiceToken,
+				"workspace": currentWorkspace,
 				"keyName":   keyName,
 				"server":    currentServerName,
+				"serverId":  savedServers[currentServerName].ServerId,
 			}
 
 			envfile.WriteEnvFile(envfile.ConfigData(configData))

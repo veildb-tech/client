@@ -11,7 +11,7 @@ import (
 // installCmd represents the install command
 var installCmd = &cobra.Command{
 	Use:   "install",
-	Short: "Install application!",
+	Short: "Install application",
 	Long:  `Installing a console application.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		install.Execute()

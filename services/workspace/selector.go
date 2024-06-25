@@ -12,58 +12,28 @@ import (
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/response"
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/token"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/workspace/servers"
 	"github.com/AlecAivazis/survey/v2"
 	"golang.org/x/exp/maps"
 )
 
-func Workspace(token string) (workspace string, server string) {
-	req, err := http.NewRequest("GET", services.WebServiceProfileUrl(), nil)
-	if err != nil {
-		fmt.Println(predefined.BuildError("Something wrong with GET request data:"), err)
-		return "", ""
+type Data struct {
+	Identifier string            `json:"identifier"`
+	Workspaces []string          `json:"workspaces"`
+	Servers    map[string]string `json:"servers"`
+}
+
+func Workspace(credentials map[string]string) map[string]string {
+	tokenRow := token.JwtToken(credentials)
+	if len(tokenRow) == 0 {
+		fmt.Println(predefined.BuildError("Something wrong. Token is empty"))
+		return nil
 	}
 
-	req.Header.Set("Accept", "application/json")
-	req.Header.Set("Authorization", "Bearer "+token)
+	workspaceData := getProfileData(tokenRow)
 
-	client := &http.Client{}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		fmt.Println(predefined.BuildError("Invalid token:"), err)
-		return "", ""
-	}
-
-	if resp == nil {
-		fmt.Println(predefined.BuildError("Bad request:"), http.StatusBadRequest)
-		return "", ""
-	}
-
-	defer resp.Body.Close()
-
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		fmt.Println(predefined.BuildError("Error:"), err)
-		return "", ""
-	}
-
-	type Data struct {
-		Identifier string            `json:"identifier"`
-		Workspaces []string          `json:"workspaces"`
-		Servers    map[string]string `json:"servers"`
-	}
-
-	// Unmarshal the JSON data into the struct
-	var workspaceData Data
 	allWorkspaces := map[int]string{}
-
-	wsErr := json.Unmarshal([]byte(data), &workspaceData)
-	if wsErr != nil {
-		response.WrongResponseObserver(data)
-		return "", ""
-	}
-
 	var workspaceResult string = ""
 
 	if len(workspaceData.Workspaces) > 1 {
@@ -88,16 +58,102 @@ func Workspace(token string) (workspace string, server string) {
 		fmt.Println(predefined.BuildWarning("You don't assigned to any workspace"))
 	}
 
-	var selectedServer string = ""
+	credentials["workspace"] = workspaceResult
+
+	tokenRow = token.JwtToken(credentials)
+	if len(tokenRow) == 0 {
+		fmt.Println(predefined.BuildError("Something wrong. Token is empty"))
+		return nil
+	}
+
+	var (
+		options                                              = []string{"Yes", "No"}
+		selectedOption, selectedServerName, selectedServerId string
+		configData                                           = map[string]string{}
+	)
+
+	prompt := &survey.Select{
+		Message: "Do you want to save a new server key or update an existing one?",
+		Options: options,
+	}
+
+	survey.AskOne(prompt, &selectedOption)
+
+	if selectedOption == "No" {
+		configData = map[string]string{
+			"token":     tokenRow,
+			"workspace": workspaceResult,
+			"server":    selectedServerName,
+			"serverId":  selectedServerId,
+		}
+
+		return configData
+	}
+
+	workspaceData = getProfileData(tokenRow)
 
 	if len(workspaceData.Servers) > 1 {
-		selectedServer = servers.Server(workspaceData.Servers)
+		selectedServerId, selectedServerName = servers.Server(workspaceData.Servers)
 	} else if len(workspaceData.Servers) == 1 {
-		selectedServer = maps.Values(workspaceData.Servers)[0]
-		fmt.Println(predefined.BuildAnsw("Your saved server: ", selectedServer))
+		selectedServerId = maps.Keys(workspaceData.Servers)[0]
+		selectedServerName = workspaceData.Servers[selectedServerId]
+
+		fmt.Println(predefined.BuildAnsw("Your saved server: ", selectedServerName))
 	} else {
 		fmt.Println(predefined.BuildWarning("You don't assigned to any server"))
 	}
 
-	return workspaceResult, selectedServer
+	configData = map[string]string{
+		"token":     tokenRow,
+		"workspace": workspaceResult,
+		"server":    selectedServerName,
+		"serverId":  selectedServerId,
+	}
+
+	return configData
+}
+
+func getProfileData(token string) Data {
+	var workspaceData Data
+
+	req, err := http.NewRequest("GET", services.WebServiceProfileUrl(), nil)
+	if err != nil {
+		fmt.Println(predefined.BuildError("Something wrong with GET request data:"), err)
+		return workspaceData
+	}
+
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+
+	client := &http.Client{}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		fmt.Println(predefined.BuildError("Invalid token:"), err)
+		return workspaceData
+	}
+
+	if resp == nil {
+		fmt.Println(predefined.BuildError("Bad request:"), http.StatusBadRequest)
+		return workspaceData
+	}
+
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		fmt.Println(predefined.BuildError("Error:"), err)
+		return workspaceData
+	}
+
+	// Unmarshal the JSON data into the struct
+	wsErr := json.Unmarshal([]byte(data), &workspaceData)
+	if wsErr != nil {
+		err := response.WrongResponseObserver(data)
+		if err != nil {
+			fmt.Println(err)
+		}
+	}
+
+	return workspaceData
 }

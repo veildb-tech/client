@@ -10,91 +10,119 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"sort"
 	"strings"
+	"time"
 
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/processes/download/helper"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/encrypter"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/envfile"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/request"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/response"
-	"github.com/AlecAivazis/survey/v2"
-	"golang.org/x/exp/maps"
 )
 
 const (
-	DefaultDumpDBName    string = "backup"
-	DefaultDumpDBExt     string = ".sql"
-	StatusReady          string = "ready"
-	StatusReadyWithError string = "ready_with_error"
+	DefaultDumpDBName string = "backup"
+	DefaultDumpDBExt  string = ".sql"
 )
 
 func Execute(dbUid, dumpUid string) {
-	savedWorkspaces, err := envfile.ReadEnvFile()
+	savedConfigData, err := envfile.ReadEnvFile()
 	if err != nil {
 		fmt.Println(predefined.BuildError("Error:"), err)
 		return
 	}
 
 	var (
-		selectedWorkspaceIndex, selectedServerIndex int
-		savedWorkspacesKeys, savedServersKeys       []string
+		selectedToken, selectedKeyPubName, selectedWorkspace, serverId, dbName string
 	)
 
-	savedWorkspacesKeys = maps.Keys(savedWorkspaces)
+	selectedWorkspace = savedConfigData.CurrentWorkspace
+	selectedToken = savedConfigData.ServiceToken
 
-	if len(savedWorkspacesKeys) > 1 {
-		prompt := &survey.Select{
-			Message: "Select one of your saved workspaces:",
-			Options: savedWorkspacesKeys,
+	selectedDataByWorkspace, ok := savedConfigData.Data[selectedWorkspace]
+	if !ok {
+		fmt.Println(predefined.BuildError("There is no record of a saved workspace"))
+		return
+	}
+
+	if dbUid == "" {
+		dbUid = helper.GetDbUid(selectedToken)
+	}
+
+	if len(dbUid) > 0 {
+		serverData := helper.GetServerData(dbUid, selectedToken)
+		if len(serverData) == 0 {
+			fmt.Println(predefined.BuildError("Failed to retrieve selected database data"))
+			return
 		}
 
-		survey.AskOne(prompt, &selectedWorkspaceIndex)
+		serverId = serverData["serverId"]
+		dbName = serverData["dbName"]
+
+		selectedKeyPubName = helper.GetServerPubKey(selectedDataByWorkspace.Servers, serverId)
+
+		if len(selectedKeyPubName) == 0 {
+			fmt.Println(predefined.BuildError("There is no saved public key for the server. Use the [login] command to create it"))
+			return
+		}
+	}
+
+	if dbUid == "" {
+		fmt.Println(predefined.BuildError("Failed to get DB UID"))
+		return
+	}
+
+	if dumpUid == "" {
+		dumpUid, err = helper.GetDumpUid(dbUid, selectedToken, selectedWorkspace)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	} else {
-		selectedWorkspaceIndex = 0
-		fmt.Println(predefined.BuildAnsw("Your saved workspaces: ", savedWorkspacesKeys[selectedWorkspaceIndex]))
-	}
+		if len(dumpUid) > 0 && dbUid == "" {
+			dbUid = helper.GetDbUidByDump(dumpUid, selectedToken)
+			if len(dumpUid) == 0 {
+				fmt.Println(predefined.BuildError("Failed to get DB UID"))
+				return
+			}
 
-	selectedToken := savedWorkspaces[savedWorkspacesKeys[selectedWorkspaceIndex]].ServiceToken
+			serverData := helper.GetServerData(dbUid, selectedToken)
+			if serverData == nil {
+				fmt.Println(predefined.BuildError("Failed to retrieve selected database data"))
+				return
+			}
 
-	if dbUid == "" {
-		dbUid = getDbUid(selectedToken)
-	}
+			serverId = serverData["serverId"]
+			dbName = serverData["dbName"]
 
-	if dbUid == "" {
-		return
+			selectedKeyPubName = helper.GetServerPubKey(selectedDataByWorkspace.Servers, serverId)
+			if len(selectedKeyPubName) == 0 {
+				fmt.Println(predefined.BuildError("There is no saved public key for the server. Use the [login] command to create it"))
+				return
+			}
+		}
 	}
 
 	if dumpUid == "" {
-		dumpUid = getDumpUid(dbUid, selectedToken, savedWorkspacesKeys[selectedWorkspaceIndex])
-	}
-
-	if dumpUid == "" {
+		fmt.Println(predefined.BuildError("Failed to get dump UID"))
 		return
 	}
 
+	var defaultDumpPath string = ""
+
+	if len(savedConfigData.DownloadDumpPath) > 0 {
+		defaultDumpPath = savedConfigData.DownloadDumpPath
+	}
+
+	currentTime := time.Now()
 	dumpDbData := map[string]string{
 		"dbuuid":   dbUid,
 		"dumpuuid": dumpUid,
+		"dumpname": DefaultDumpDBName + "_" + selectedWorkspace + "_" + dbName + "_" + currentTime.Format("2000-01-01 00:00:00"),
+		"dumppath": defaultDumpPath,
 	}
-
-	savedServers := savedWorkspaces[savedWorkspacesKeys[selectedWorkspaceIndex]].Servers
-	savedServersKeys = maps.Keys(savedServers)
-
-	if len(savedServersKeys) > 1 {
-		promptS := &survey.Select{
-			Message: "Select one of your saved servers:",
-			Options: savedServersKeys,
-		}
-
-		survey.AskOne(promptS, &selectedServerIndex)
-	} else {
-		selectedServerIndex = 0
-		fmt.Println(predefined.BuildAnsw("Your saved server: ", savedServersKeys[selectedServerIndex]))
-	}
-
-	selectedKeyPubName := savedServers[savedServersKeys[selectedServerIndex]].KeyFile
 
 	encryptedData := encrypter.EncryptData(dumpDbData, selectedKeyPubName)
 	if encryptedData == nil {
@@ -104,125 +132,8 @@ func Execute(dbUid, dumpUid string) {
 	download(dumpDbData, encryptedData, selectedToken)
 }
 
-func getDbUid(token string) string {
-	data, err := request.CreateGetRequest(services.WebServiceDatabaseListUrl(), &token)
-	if err != nil {
-		fmt.Println(predefined.BuildError("Error:"), err)
-		return ""
-	}
-
-	type Data struct {
-		Name string `json:"name"`
-		Uid  string `json:"uid"`
-	}
-
-	var (
-		dbData        []Data
-		allDbDataName []string
-	)
-
-	dbErr := json.Unmarshal([]byte(data), &dbData)
-	if dbErr != nil {
-		response.WrongResponseObserver(data)
-		return ""
-	}
-
-	if len(dbData) > 0 {
-		for _, uid := range dbData {
-			allDbDataName = append(allDbDataName, uid.Name)
-		}
-
-		sort.Strings(allDbDataName)
-
-		var selectedDb int
-
-		prompt := &survey.Select{
-			Message: "Please select database to process with:",
-			Options: allDbDataName,
-		}
-
-		survey.AskOne(prompt, &selectedDb)
-
-		return dbData[selectedDb].Uid
-	} else {
-		fmt.Println(predefined.BuildWarning("Not found active databases"))
-	}
-
-	return ""
-}
-
-func getDumpUid(dbUid string, token string, selectedWorkspace string) string {
-	var (
-		//Uncomment if you need to load workspaces and not use them from the env file.
-		//selectedWorkspace string = workspace.Workspace(token)
-		requestUrl string = services.WebServiceDatabaseDumpUrl() + "?db.uid=" + dbUid + "&workspace=" + selectedWorkspace +
-			"&status[]=" + StatusReady + "&status[]=" + StatusReadyWithError
-	)
-
-	data, err := request.CreateGetRequest(requestUrl, &token)
-	if err != nil {
-		fmt.Println(predefined.BuildError("Error:"), err)
-		return ""
-	}
-
-	type Data struct {
-		Uuid string `json:"uuid"`
-		Date string `json:"updated_at"`
-	}
-
-	var (
-		dumps    []Data
-		allDumps []string
-	)
-
-	dbErr := json.Unmarshal([]byte(data), &dumps)
-	if dbErr != nil {
-		response.WrongResponseObserver(data)
-		return ""
-	}
-
-	if len(dumps) > 0 {
-		for _, uid := range dumps {
-			allDumps = append(allDumps, uid.Uuid+"["+uid.Date+"]")
-		}
-
-		sort.Strings(allDumps)
-
-		var selectedDb int
-
-		prompt := &survey.Select{
-			Message: "Please select dump to process with:",
-			Options: allDumps,
-		}
-
-		survey.AskOne(prompt, &selectedDb)
-
-		return dumps[selectedDb].Uuid
-	} else {
-		fmt.Println(predefined.BuildWarning("Not found active dumps for selected DB"))
-	}
-
-	return ""
-}
-
 func download(dumpDbData map[string]string, encryptedData []byte, token string) {
-	var saveDumpPath, saveDumpName string
-
-	prompt := &survey.Input{
-		Message: "Specify path to save dump:",
-		Help:    "By default, the save directory is the location directory of the console application",
-	}
-
-	survey.AskOne(prompt, &saveDumpPath)
-
-	prompt = &survey.Input{
-		Message: "Specify filename:",
-		Help:    "Default DB name is " + DefaultDumpDBName + DefaultDumpDBExt,
-		Default: DefaultDumpDBName,
-	}
-
-	survey.AskOne(prompt, &saveDumpName)
-
+	var saveDumpName string = dumpDbData["dumpname"]
 	if len(saveDumpName) == 0 {
 		return
 	}
@@ -245,8 +156,11 @@ func download(dumpDbData map[string]string, encryptedData []byte, token string) 
 
 	configErr := json.Unmarshal(data, &dumLinkData)
 	if configErr != nil {
-		response.WrongResponseObserver(data)
-		return
+		err := response.WrongResponseObserver(data)
+		if err != nil {
+			fmt.Println(err)
+			return
+		}
 	}
 
 	if len(dumLinkData) > 0 {
@@ -263,11 +177,25 @@ func download(dumpDbData map[string]string, encryptedData []byte, token string) 
 			return
 		}
 
-		if len(strings.TrimSpace(saveDumpPath)) == 0 {
-			saveDumpPath = configDir + "/"
-		} else {
+		var saveDumpPath string = ""
+
+		if len(dumpDbData["dumpname"]) > 0 {
+			saveDumpPath = dumpDbData["dumpname"]
 			saveDumpPath = strings.TrimRight(saveDumpPath, "/")
 			saveDumpPath += "/"
+		} else {
+			saveDumpPath, err = helper.DefaultDumpPath()
+			if err != nil {
+				fmt.Println(predefined.BuildError("Error:"), err)
+				return
+			}
+
+			if len(strings.TrimSpace(saveDumpPath)) == 0 {
+				saveDumpPath = configDir + "/"
+			} else {
+				saveDumpPath = strings.TrimRight(saveDumpPath, "/")
+				saveDumpPath += "/"
+			}
 		}
 
 		saveDumpName = strings.TrimSuffix(saveDumpName, DefaultDumpDBExt)

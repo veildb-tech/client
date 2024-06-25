@@ -4,24 +4,27 @@ Copyright © 2024 Bridge Digital
 package servers
 
 import (
+	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/util"
 	"github.com/AlecAivazis/survey/v2"
+	"golang.org/x/exp/maps"
 )
 
-func Server(servers map[string]string) string {
-	allServers := []string{}
+func Server(servers map[string]string) (serverId string, serverName string) {
+	var (
+		selectedServerIndex int
+		serversValues       []string
+	)
 
-	for _, server := range servers {
-		allServers = append(allServers, server)
-	}
-
-	var selectedServer int
+	serversValues = maps.Values(servers)
 
 	prompt := &survey.Select{
 		Message: "Select server:",
-		Options: allServers,
+		Options: serversValues,
 	}
 
-	survey.AskOne(prompt, &selectedServer)
+	survey.AskOne(prompt, &selectedServerIndex)
 
-	return allServers[selectedServer]
+	selectedServerId := util.MapKeyByValue(servers, serversValues[selectedServerIndex])
+
+	return selectedServerId, serversValues[selectedServerIndex]
 }

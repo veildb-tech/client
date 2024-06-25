@@ -11,7 +11,7 @@ import (
 // downloadCmd represents the download command
 var downloadCmd = &cobra.Command{
 	Use:   "download",
-	Short: "Download dump!",
+	Short: "Download dump",
 	Long:  `Downloading a dump of the database.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		dumpUid, _ := cmd.Flags().GetString("dump-uid")

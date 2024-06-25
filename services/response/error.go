@@ -15,24 +15,23 @@ type WrongData struct {
 	Msg  string `json:"message"`
 }
 
-func WrongResponseObserver(data []byte) {
+func WrongResponseObserver(data []byte) error {
 	var wrongData WrongData
 
 	dbErr := json.Unmarshal([]byte(data), &wrongData)
 	if dbErr != nil {
-		fmt.Println(predefined.BuildError("Error decoding from json:"), dbErr)
-		return
+		return fmt.Errorf(predefined.BuildError("Error decoding from json:"), dbErr)
 	}
 
 	if wrongData.Code == 401 && wrongData.Msg == "Invalid JWT Token" {
-		fmt.Println(predefined.BuildWarning("Your token has expired. Use the [login] command to update it"))
-		return
+		return fmt.Errorf(predefined.BuildWarning("Your token has expired. Use the [login] command to update it"))
 	} else {
+		var error error
 		if wrongData.Code > 0 && len(wrongData.Msg) > 0 {
-			fmt.Printf(predefined.BuildError("Code: %d. Message: %s \n"), wrongData.Code, wrongData.Msg)
+			error = fmt.Errorf(predefined.BuildError("Code: %d. Message: %s \n"), wrongData.Code, wrongData.Msg)
 		} else {
-			fmt.Println(predefined.BuildError("Something wrong!"))
+			error = fmt.Errorf(predefined.BuildError("Something wrong!"))
 		}
-		return
+		return error
 	}
 }
