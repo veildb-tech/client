@@ -19,7 +19,8 @@ var installCmd = &cobra.Command{
 }
 
 func init() {
-	rootCmd.AddCommand(installCmd)
+	// Disable temporary install command
+	//rootCmd.AddCommand(installCmd)
 
 	// Here you will define your flags and configuration settings.
 
