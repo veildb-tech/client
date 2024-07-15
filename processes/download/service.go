@@ -20,6 +20,7 @@ import (
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/predefined"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/request"
 	"gitea.bridge.digital/bridgedigital/db-manager-client-cli-go/services/response"
+	"github.com/AlecAivazis/survey/v2"
 )
 
 const (
@@ -179,8 +180,8 @@ func download(dumpDbData map[string]string, encryptedData []byte, token string) 
 
 		var saveDumpPath string = ""
 
-		if len(dumpDbData["dumpname"]) > 0 {
-			saveDumpPath = dumpDbData["dumpname"]
+		if len(dumpDbData["dumppath"]) > 0 {
+			saveDumpPath = dumpDbData["dumppath"]
 			saveDumpPath = strings.TrimRight(saveDumpPath, "/")
 			saveDumpPath += "/"
 		} else {
@@ -190,13 +191,18 @@ func download(dumpDbData map[string]string, encryptedData []byte, token string) 
 				return
 			}
 
-			if len(strings.TrimSpace(saveDumpPath)) == 0 {
-				saveDumpPath = configDir + "/"
-			} else {
-				saveDumpPath = strings.TrimRight(saveDumpPath, "/")
-				saveDumpPath += "/"
-			}
+			saveDumpPath = pathTrimer(saveDumpPath, configDir)
 		}
+
+		prompt := &survey.Input{
+			Message: "Specify the path to save the dump or press Enter to leave it as default:",
+			Help:    "The default save directory is the home directory or the directory set using the [config] command",
+			Default: saveDumpPath,
+		}
+
+		survey.AskOne(prompt, &saveDumpPath)
+
+		saveDumpPath = pathTrimer(saveDumpPath, configDir)
 
 		saveDumpName = strings.TrimSuffix(saveDumpName, DefaultDumpDBExt)
 
@@ -252,4 +258,15 @@ func downloadFile(link string, encryptedData []byte, fullFilePath string) {
 		fmt.Printf(predefined.BuildError("Error copying response body to file: %v"), err)
 		return
 	}
+}
+
+func pathTrimer(saveDumpPath string, configDir string) string {
+	if len(strings.TrimSpace(saveDumpPath)) == 0 {
+		saveDumpPath = configDir + "/"
+	} else {
+		saveDumpPath = strings.TrimRight(saveDumpPath, "/")
+		saveDumpPath += "/"
+	}
+
+	return saveDumpPath
 }
