@@ -1,99 +1,88 @@
-name: Build and Upload Binaries
+name: Build Go Binaries and Upload to S3
 
 on:
-  push:
-    branches:
-      - main
   workflow_dispatch:
 
+permissions:
+  id-token: write
+  contents: read
+
 jobs:
-  build:
+  build-and-upload:
     runs-on: ubuntu-latest
 
+    strategy:
+      matrix:
+        include:
+          - os: linux
+            goos: linux
+            goarch: amd64
+            ext: ""
+          - os: darwin-amd64
+            goos: darwin
+            goarch: amd64
+            ext: ""
+          - os: darwin-arm64
+            goos: darwin
+            goarch: arm64
+            ext: ""
+          - os: windows
+            goos: windows
+            goarch: amd64
+            ext: ".exe"
+
     env:
-      APP_NAME: veildb
-      S3_PATH: download
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      S3_BUCKET: ${{ vars.S3_BUCKET }}
+      S3_PREFIX: download
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Setup Go
         uses: actions/setup-go@v5
         with:
           go-version: '1.22'
+          cache: true
 
-      - name: Create bin directory
-        run: mkdir -p bin
-
-      # -------------------------
-      # Linux
-      # -------------------------
-      - name: Build Linux amd64
+      - name: Build binary
         run: |
-          GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o bin/${APP_NAME}
+          set -euo pipefail
 
-      - name: Archive Linux
+          mkdir -p bin
+
+          OUTPUT="bin/veildb${{ matrix.ext }}"
+
+          echo "Building for ${{ matrix.goos }} / ${{ matrix.goarch }}"
+          GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
+          go build -ldflags="-s -w" -o "$OUTPUT"
+
+      - name: Archive binary
         run: |
+          set -euo pipefail
+
+          ARCHIVE_NAME="veildb-${{ matrix.goos }}-${{ matrix.goarch }}-latest.zip"
+
           cd bin
-          tar -czvf ${APP_NAME}-linux-amd64-latest.tar.gz ${APP_NAME}
+          zip "$ARCHIVE_NAME" "veildb${{ matrix.ext }}"
+          mv "$ARCHIVE_NAME" ../
           cd ..
 
-      # -------------------------
-      # macOS amd64
-      # -------------------------
-      - name: Build macOS amd64
-        run: |
-          GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/${APP_NAME}
+          echo "ARCHIVE_NAME=$ARCHIVE_NAME" >> $GITHUB_ENV
 
-      - name: Archive macOS amd64
-        run: |
-          cd bin
-          tar -czvf ${APP_NAME}-macos-amd64-latest.tar.gz ${APP_NAME}
-          cd ..
-
-      # -------------------------
-      # macOS arm64
-      # -------------------------
-      - name: Build macOS arm64
-        run: |
-          GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/${APP_NAME}
-
-      - name: Archive macOS arm64
-        run: |
-          cd bin
-          tar -czvf ${APP_NAME}-macos-arm64-latest.tar.gz ${APP_NAME}
-          cd ..
-
-      # -------------------------
-      # Windows
-      # -------------------------
-      - name: Build Windows amd64
-        run: |
-          GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/${APP_NAME}.exe
-
-      - name: Archive Windows
-        run: |
-          cd bin
-          zip ${APP_NAME}-windows-amd64-latest.zip ${APP_NAME}.exe
-          cd ..
-
-      # -------------------------
-      # Configure AWS
-      # -------------------------
-      - name: Configure AWS Credentials
+      - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ vars.AWS_ROLE_TO_ASSUME }}
+          aws-region: ${{ env.AWS_REGION }}
 
-      # -------------------------
-      # Upload to S3
-      # -------------------------
-      - name: Upload archives to S3
+      - name: Upload to S3
         run: |
-          aws s3 cp bin/${APP_NAME}-linux-amd64-latest.tar.gz s3://${{ secrets.S3_BUCKET }}/${S3_PATH}/
-          aws s3 cp bin/${APP_NAME}-macos-amd64-latest.tar.gz s3://${{ secrets.S3_BUCKET }}/${S3_PATH}/
-          aws s3 cp bin/${APP_NAME}-macos-arm64-latest.tar.gz s3://${{ secrets.S3_BUCKET }}/${S3_PATH}/
-          aws s3 cp bin/${APP_NAME}-windows-amd64-latest.zip s3://${{ secrets.S3_BUCKET }}/${S3_PATH}/
+          set -euo pipefail
+
+          aws s3 cp "$ARCHIVE_NAME" \
+            "s3://${S3_BUCKET}/${S3_PREFIX}/${ARCHIVE_NAME}" \
+            --only-show-errors
+
+          echo "Uploaded $ARCHIVE_NAME"
