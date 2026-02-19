@@ -15,9 +15,9 @@ import (
 )
 
 const (
-	DefaultWebServiceUrl string = "https://app.dbvisor.pro"
+	DefaultWebServiceUrl string = "https://app.veildb.com"
 	WebServiceApiUrl     string = "api"
-	AppName              string = "dbvisor"
+	AppName              string = "veildb"
 	EnvFileName          string = ".env.json"
 	PubKeyExt            string = ".pem"
 )
@@ -100,7 +100,7 @@ func CurrentAppDir() (string, error) {
 		return "", fmt.Errorf(predefined.BuildError("can not get current HOME user directory: %w"), err)
 	}
 
-	var appDir string = homeDir + "/.dbvisor"
+	var appDir string = homeDir + "/.veildb"
 
 	if err := os.MkdirAll(appDir, os.ModePerm); err != nil {
 		return "", fmt.Errorf(predefined.BuildError("can not get current app directory: %w"), err)

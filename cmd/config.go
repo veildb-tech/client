@@ -24,5 +24,5 @@ var configCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(configCmd)
 	configCmd.Flags().StringP("dump-path", "d", "", "Set new path for saving dumps")
-	configCmd.Flags().StringP("url", "u", "", "Set service URL (e.g., https://app.dbvisor.pro)")
+	configCmd.Flags().StringP("url", "u", "", "Set service URL (e.g., https://app.veildb.com)")
 }

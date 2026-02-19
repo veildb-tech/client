@@ -113,7 +113,7 @@ func promptForServiceUrl() string {
 		Prompt: &survey.Input{
 			Message: "Service URL:",
 			Default: services.DefaultWebServiceUrl,
-			Help:    "Enter the dbvisor service URL (e.g., https://app.dbvisor.pro)",
+			Help:    "Enter the VeilDB service URL (e.g., https://app.veildb.com)",
 		},
 		Validate: func(val interface{}) error {
 			if str, _ := val.(string); len(strings.TrimSpace(str)) == 0 {

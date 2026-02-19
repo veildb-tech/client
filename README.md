@@ -1,28 +1,28 @@
-# DBVisor 
+# VeilDB
 
-DBvisor App is a CLI utility designed for convenient work on downloading the necessary database dumps
- 
+VeilDB is a CLI utility designed for convenient work on downloading the necessary database dumps
+
 ## Documentation:
 ### Flags
 Flag ```-ldflags="-s -w"``` - is reduce the resulting binary size.
 Flag ```-tags dev``` - served for compiling a binary file with settings for the dev server.
 
-  
+
 ### Builds
 
 #### Creating a build for Linux
-To create a build for Linux, you need to go to the root of the directory where the code is contained and run the command: ```go build -ldflags="-s -w" -o dbvisor```
+To create a build for Linux, you need to go to the root of the directory where the code is contained and run the command: ```go build -ldflags="-s -w" -o veildb```
 And then place the executable file in the bin directory (if it doesn’t exist, then create it)
 
 #### Creating a build for Mac
-To create a build for Mac, you need to go to the root of the directory where the code is contained and run the command: ```GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/dbvisor```
+To create a build for Mac, you need to go to the root of the directory where the code is contained and run the command: ```GOOS=darwin GOARCH=amd64 go build -ldflags="-s -w" -o bin/veildb```
 
 #### ARM
-```GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/dbvisor```
+```GOOS=darwin GOARCH=arm64 go build -ldflags="-s -w" -o bin/veildb```
 And then place the executable file in the bin directory (if it doesn’t exist, then create it)
 
 #### Creating a build for Windows
-To create a build for Windows, you need to go to the root of the directory where the code is contained and run the command: ```GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/dbvisor.exe```
+To create a build for Windows, you need to go to the root of the directory where the code is contained and run the command: ```GOOS=windows GOARCH=amd64 go build -ldflags="-s -w" -o bin/veildb.exe```
 
   
 ### Commands
