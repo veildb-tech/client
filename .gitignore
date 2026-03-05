@@ -1,3 +1,9 @@
 *.code-workspace
 launch.json
 bin/*
+
+
+__debug_*
+.idea
+*.gz
+*.sql
