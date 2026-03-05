@@ -32,7 +32,7 @@ func Workspace(credentials map[string]string) map[string]string {
 		return nil
 	}
 
-	workspaceData := getProfileData(tokenRow)
+	workspaceData := GetProfileData(tokenRow)
 
 	allWorkspaces := map[int]string{}
 	var workspaceResult string = ""
@@ -91,7 +91,7 @@ func Workspace(credentials map[string]string) map[string]string {
 		return configData
 	}
 
-	workspaceData = getProfileData(tokenRow)
+	workspaceData = GetProfileData(tokenRow)
 
 	if len(workspaceData.Servers) > 1 {
 		selectedServerId, selectedServerName = servers.Server(workspaceData.Servers)
@@ -114,7 +114,7 @@ func Workspace(credentials map[string]string) map[string]string {
 	return configData
 }
 
-func getProfileData(token string) Data {
+func GetProfileData(token string) Data {
 	var workspaceData Data
 
 	req, err := http.NewRequest("GET", services.WebServiceProfileUrl(), nil)
