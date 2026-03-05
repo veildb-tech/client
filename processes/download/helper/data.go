@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"sort"
 	"strings"
+	"time"
 
 	"github.com/dbvisor-pro/client/services"
 	"github.com/dbvisor-pro/client/services/envfile"
@@ -114,6 +115,38 @@ func GetDbUidByDump(dumpUid string, token string) string {
 	return dbUid
 }
 
+func GetLatestDumpUid(dbUid string, token string, selectedWorkspace string) (string, error) {
+	var (
+		requestUrl string = services.WebServiceDatabaseDumpUrl() + "?db.uid=" + dbUid + "&workspace=" + selectedWorkspace +
+			"&status[]=" + StatusReady + "&status[]=" + StatusReadyWithError
+	)
+
+	data, err := request.CreateGetRequest(requestUrl, &token)
+	if err != nil {
+		return "", fmt.Errorf(predefined.BuildError("Error:"), err)
+	}
+
+	type Data struct {
+		Uuid string `json:"uuid"`
+	}
+
+	var dumps []Data
+
+	dbErr := json.Unmarshal([]byte(data), &dumps)
+	if dbErr != nil {
+		err := response.WrongResponseObserver(data)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	if len(dumps) == 0 {
+		return "", fmt.Errorf(predefined.BuildWarning("Not found active dumps for selected DB"))
+	}
+
+	return dumps[0].Uuid, nil
+}
+
 func GetDumpUid(dbUid string, token string, selectedWorkspace string) (string, error) {
 	var (
 		//Uncomment if you need to load workspaces and not use them from the env file.
@@ -128,8 +161,9 @@ func GetDumpUid(dbUid string, token string, selectedWorkspace string) (string, e
 	}
 
 	type Data struct {
-		Uuid string `json:"uuid"`
-		Date string `json:"updated_at"`
+		Uuid      string `json:"uuid"`
+		Filename  string `json:"filename"`
+		CreatedAt string `json:"created_at"`
 	}
 
 	var (
@@ -149,12 +183,12 @@ func GetDumpUid(dbUid string, token string, selectedWorkspace string) (string, e
 
 	if len(dumps) > 0 {
 		for _, dump := range dumps {
-			dumpName := dump.Uuid + "[" + dump.Date + "]"
-			allDumps = append(allDumps, dumpName)
-			readyDumps[dumpName] = dump.Uuid
+			label := formatDumpLabel(dump.CreatedAt, dump.Filename)
+			allDumps = append(allDumps, label)
+			readyDumps[label] = dump.Uuid
 		}
 
-		sort.Strings(allDumps)
+		sort.Sort(sort.Reverse(sort.StringSlice(allDumps)))
 
 		var selectedDb int
 
@@ -230,4 +264,23 @@ func GetDbUid(token string) string {
 	}
 
 	return ""
+}
+
+func formatDumpLabel(createdAt, filename string) string {
+	t, err := time.Parse(time.RFC3339, createdAt)
+	if err != nil {
+		t, err = time.Parse("2006-01-02T15:04:05-07:00", createdAt)
+	}
+
+	var dateStr string
+	if err == nil {
+		dateStr = t.Format("2006-01-02 15:04")
+	} else {
+		dateStr = createdAt
+	}
+
+	if filename != "" {
+		return dateStr + " (" + filename + ")"
+	}
+	return dateStr
 }

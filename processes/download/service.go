@@ -28,7 +28,7 @@ const (
 	DefaultDumpDBExt  string = ".sql.gz"
 )
 
-func Execute(dbUid, dumpUid string) {
+func Execute(dbUid, dumpUid string, latestDump bool) {
 	savedConfigData, err := envfile.ReadEnvFile()
 	if err != nil {
 		fmt.Println(predefined.BuildError("Error:"), err)
@@ -76,7 +76,11 @@ func Execute(dbUid, dumpUid string) {
 	}
 
 	if dumpUid == "" {
-		dumpUid, err = helper.GetDumpUid(dbUid, selectedToken, selectedWorkspace)
+		if latestDump {
+			dumpUid, err = helper.GetLatestDumpUid(dbUid, selectedToken, selectedWorkspace)
+		} else {
+			dumpUid, err = helper.GetDumpUid(dbUid, selectedToken, selectedWorkspace)
+		}
 		if err != nil {
 			fmt.Println(err)
 			return
