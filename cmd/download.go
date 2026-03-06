@@ -16,8 +16,9 @@ var downloadCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		dumpUid, _ := cmd.Flags().GetString("dump-uid")
 		dbUid, _ := cmd.Flags().GetString("db-uid")
+		latestDump, _ := cmd.Flags().GetBool("latest-dump")
 
-		download.Execute(dbUid, dumpUid)
+		download.Execute(dbUid, dumpUid, latestDump)
 	},
 }
 
@@ -25,4 +26,5 @@ func init() {
 	rootCmd.AddCommand(downloadCmd)
 	downloadCmd.Flags().String("dump-uid", "", "Enter DB Dump UID")
 	downloadCmd.Flags().String("db-uid", "", "Enter DB UID")
+	downloadCmd.Flags().Bool("latest-dump", false, "Download the latest dump without selection")
 }
